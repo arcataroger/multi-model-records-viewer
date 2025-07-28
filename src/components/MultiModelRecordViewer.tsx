@@ -6,9 +6,12 @@ type Props = {
 };
 
 export default function MultiModelRecordViewer({ ctx }: Props) {
+  const { itemTypes, currentUserAccessToken } = ctx;
+
   return (
     <Canvas ctx={ctx}>
-      <p>Welcome to your plugin! This is your config screen!</p>
+      <h2>Site</h2>
+      <pre>{JSON.stringify(itemTypes, null, 2)}</pre>
       <div>
         <ContextInspector />
       </div>
