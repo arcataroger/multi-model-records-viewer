@@ -1,21 +1,14 @@
 import type { RenderPageCtx } from "datocms-plugin-sdk";
 import { Canvas, ContextInspector } from "datocms-react-ui";
-import { buildClient } from "@datocms/cma-client-browser";
-import {
-  DataGrid,
-  type GridColDef,
-  type GridDataSource,
-  type GridGetRowsParams,
-  type GridGetRowsResponse,
-  type GridRowModel,
-} from "@mui/x-data-grid";
+import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import { useDatoDataSource } from "../utils/useDatoDataSource.tsx";
 
 type Props = {
   ctx: RenderPageCtx;
 };
 
 export default function MultiModelRecordViewer({ ctx }: Props) {
-  const { itemTypes, alert, currentUserAccessToken } = ctx;
+  const { alert, currentUserAccessToken } = ctx;
 
   // Abort early if no access token
   // TODO add better check for proper permissions
@@ -28,48 +21,17 @@ export default function MultiModelRecordViewer({ ctx }: Props) {
     );
   }
 
-  const cmaDataSourceForDataGrid: GridDataSource = {
-    getRows: async (
-      params: GridGetRowsParams,
-    ): Promise<GridGetRowsResponse> => {
-      const cma = buildClient({
-        apiToken: currentUserAccessToken,
-      });
-
-      const records = await cma.items.list();
-
-      const rows: GridRowModel[] = records.map((record) => {
-        const {
-          id,
-          item_type: { id: itemTypeId },
-          creator,
-          meta: { status, updated_at },
-        } = record;
-
-        const creatorId = creator?.id ?? "Unknown"; // TODO Better disambiguate creator types
-
-        return {
-          id,
-          itemTypeId,
-          creator: creatorId,
-          status,
-          updated_at,
-        };
-      });
-
-      return {
-        rows: rows,
-        rowCount: rows.length,
-      };
-    },
-  };
+  const { dataSource, initialState } = useDatoDataSource({
+    apiToken: currentUserAccessToken,
+    initialPageSize: 50,
+  });
 
   const columns: GridColDef[] = [
     { field: "id", headerName: "ID" },
     { field: "itemTypeId", headerName: "Item Type" },
     { field: "creator", headerName: "Author" },
     { field: "status", headerName: "Status" },
-    { field: "updated_at", headerName: "Updated" },
+    { field: "updated_at", headerName: "Updated", type: "dateTime" },
   ];
 
   return (
@@ -78,7 +40,9 @@ export default function MultiModelRecordViewer({ ctx }: Props) {
       <DataGrid
         columns={columns}
         pagination={true}
-        dataSource={cmaDataSourceForDataGrid}
+        dataSource={dataSource}
+        initialState={initialState}
+        pageSizeOptions={[50, 100, 500, 1000]}
       />
       <div>
         <ContextInspector />
