@@ -6,6 +6,7 @@ import {
 } from "@datocms/cma-client-browser";
 import type { ItemInstancesHrefSchema } from "@datocms/cma-client/dist/types/generated/SimpleSchemaTypes";
 import type {
+  GridColDef,
   GridDataSource,
   GridGetRowsParams,
   GridRowModel,
@@ -13,7 +14,7 @@ import type {
 
 interface UseDatoDataSourceOptions {
   apiToken: string;
-  modelId?: string;
+  modelIds?: string;
   initialPageSize?: number;
   environment?: string;
   logLevel?: keyof typeof LogLevel;
@@ -21,8 +22,8 @@ interface UseDatoDataSourceOptions {
 
 export const useDatoDataSource = ({
   apiToken,
-  modelId,
-  initialPageSize = 10,
+  modelIds,
+  initialPageSize = 50,
   environment,
   logLevel = "NONE",
 }: UseDatoDataSourceOptions) => {
@@ -58,10 +59,11 @@ export const useDatoDataSource = ({
 
       const hrefParams: ItemInstancesHrefSchema = {
         filter: {
-          ...(modelId ? { type: modelId } : {}),
+          ...(modelIds ? { type: modelIds } : {}),
           fields: Object.keys(fields).length ? fields : undefined,
         },
         page: { offset, limit },
+        version: "current",
       };
 
       if (sortModel.length) {
@@ -70,39 +72,37 @@ export const useDatoDataSource = ({
           .join(",");
       }
 
-      const records = await client.items.list(hrefParams);
+      const records = await client.items.rawList(hrefParams);
 
-      const rows: GridRowModel[] = records.map((record) => {
+      const rows: GridRowModel[] = records.data.map((record) => {
         const {
           id,
-          item_type: { id: itemTypeId },
-          creator,
+          relationships: {
+            creator,
+            item_type: {
+              data: { id: itemTypeId },
+            },
+          },
           meta: { status, updated_at },
         } = record;
 
-        const creatorId = creator?.id ?? "Unknown"; // TODO Better disambiguate creator types
+        const creatorId = creator?.data?.id ?? "Unknown"; // TODO Better disambiguate creator types
 
         return {
           id,
           itemTypeId,
           creator: creatorId,
-          status,
-          updated_at,
+          _status: status,
+          _updated_at: updated_at,
         };
-      });
-
-      // fetch just the total count
-      const raw = await client.items.rawList({
-        ...hrefParams,
-        page: { limit: 0 },
       });
 
       return {
         rows: rows,
-        rowCount: raw.meta.total_count,
+        rowCount: records.meta.total_count,
       };
     },
-    [client, modelId, initialPageSize],
+    [client, modelIds, initialPageSize],
   );
 
   const initialState = React.useMemo(
@@ -115,7 +115,21 @@ export const useDatoDataSource = ({
     [initialPageSize],
   );
 
-  return { dataSource: { getRows }, initialState };
+  const columns: GridColDef[] = [
+    { field: "id", headerName: "ID", type: "string" },
+    { field: "itemTypeId", headerName: "Item Type", type: "string" },
+    { field: "creator", headerName: "Author" },
+    { field: "_status", headerName: "Status" },
+    {
+      field: "_updated_at",
+      headerName: "Updated",
+      type: "dateTime",
+      valueGetter: (dateTimeIso) => new Date(dateTimeIso),
+      valueParser: (jsDate: Date) => jsDate.toISOString(),
+    },
+  ];
+
+  return { dataSource: { getRows }, initialState, columns };
 };
 
 const operatorMap: Record<string, string> = {

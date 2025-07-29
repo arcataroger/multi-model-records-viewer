@@ -1,6 +1,6 @@
 import type { RenderPageCtx } from "datocms-plugin-sdk";
 import { Canvas, ContextInspector } from "datocms-react-ui";
-import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import { DataGrid, useGridApiRef } from "@mui/x-data-grid";
 import { useDatoDataSource } from "../utils/useDatoDataSource.tsx";
 
 type Props = {
@@ -21,28 +21,29 @@ export default function MultiModelRecordViewer({ ctx }: Props) {
     );
   }
 
-  const { dataSource, initialState } = useDatoDataSource({
+  const { dataSource, initialState, columns } = useDatoDataSource({
     apiToken: currentUserAccessToken,
-    initialPageSize: 50,
   });
 
-  const columns: GridColDef[] = [
-    { field: "id", headerName: "ID" },
-    { field: "itemTypeId", headerName: "Item Type" },
-    { field: "creator", headerName: "Author" },
-    { field: "status", headerName: "Status" },
-    { field: "updated_at", headerName: "Updated", type: "dateTime" },
-  ];
+  const dataGridRef = useGridApiRef();
 
   return (
     <Canvas ctx={ctx}>
       <h2>Records</h2>
       <DataGrid
+        apiRef={dataGridRef}
         columns={columns}
         pagination={true}
         dataSource={dataSource}
         initialState={initialState}
-        pageSizeOptions={[50, 100, 500, 1000]}
+        pageSizeOptions={[50, 100, 500]}
+        dataSourceCache={null}
+        onStateChange={() => {
+          dataGridRef.current?.autosizeColumns({
+            includeHeaders: true,
+            includeOutliers: false,
+          });
+        }}
       />
       <div>
         <ContextInspector />
